@@ -134,8 +134,12 @@ function startGame() {
 
 // ───── Klaviatura — bağlama ─────
 function bindKeyboard() {
+  // Üfüqi çubuq: sol/sağ hərəkət (klassik Up/Down da geri-uyğun saxlanılır)
   const keymap = {
-    "ArrowUp": "up", "ArrowDown": "down",
+    "ArrowLeft": "leftUp", "ArrowRight": "leftDown",
+    "ArrowUp": "leftUp",   "ArrowDown": "leftDown",
+    "a": "leftUp", "A": "leftUp",
+    "d": "leftDown", "D": "leftDown",
     "w": "leftUp", "W": "leftUp",
     "s": "leftDown", "S": "leftDown",
   };
@@ -169,29 +173,25 @@ function bindKeyboard() {
 
 // ───── Toxunma — bağlama (multi-touch, gecikməsiz) ─────
 //
-// Strategiya:
-//  • PvC rejimi: ekranın istənilən nöqtəsindən sol raket idarə olunur
-//    (rəqib tərəfindən belə — barmağı orada saxlasan da işləyir).
-//  • PvP rejimi: ekranın sol yarısı sol raket, sağ yarısı sağ raket;
-//    eyni anda iki barmaq işlənə bilər.
-//  • Touch event-ləri stage-də capture edilir, paddle birbaşa
-//    barmağın Y mövqeyinə yapışdırılır (heç bir smoothing).
+// Çubuqlar üfüqi (alt-üst), barmağın X mövqeyinə görə hərəkət edir.
+//  • PvC rejimi: istənilən nöqtəyə toxun → bottom çubuq (sən)
+//  • PvP rejimi: ekranın aşağı yarısı → bottom, yuxarı yarısı → top
 function bindTouch() {
-  // Hər aktiv touch ID-si → idarə etdiyi tərəf
-  const activeTouches = new Map();
+  const activeTouches = new Map(); // identifier → "left" | "right"
 
-  const sideForX = (clientX) => {
+  const sideForY = (clientY) => {
     if (state.settings.mode === "pvp") {
       const rect = dom.canvas.getBoundingClientRect();
-      return clientX < rect.left + rect.width / 2 ? "left" : "right";
+      // Aşağı yarı = bottom çubuq ("left"), yuxarı yarı = top çubuq ("right")
+      return clientY > rect.top + rect.height / 2 ? "left" : "right";
     }
     return "left";
   };
 
-  const updatePaddle = (side, clientY) => {
+  const updatePaddle = (side, clientX) => {
     const rect = dom.canvas.getBoundingClientRect();
-    const cssY = clientY - rect.top;
-    state.game?.setTouchY(side, cssY);
+    const cssX = clientX - rect.left;
+    state.game?.setTouchX(side, cssX);
   };
 
   const onTouchStart = (e) => {
@@ -202,9 +202,9 @@ function bindTouch() {
       startGame();
     }
     for (const t of e.changedTouches) {
-      const side = sideForX(t.clientX);
+      const side = sideForY(t.clientY);
       activeTouches.set(t.identifier, side);
-      updatePaddle(side, t.clientY);
+      updatePaddle(side, t.clientX);
     }
   };
 
@@ -213,7 +213,7 @@ function bindTouch() {
     e.preventDefault();
     for (const t of e.changedTouches) {
       const side = activeTouches.get(t.identifier);
-      if (side) updatePaddle(side, t.clientY);
+      if (side) updatePaddle(side, t.clientX);
     }
   };
 
@@ -228,24 +228,23 @@ function bindTouch() {
     }
   };
 
-  // Body-yə bağlayırıq — istənilən nöqtəyə toxun
   document.body.addEventListener("touchstart", onTouchStart, { passive: false });
   document.body.addEventListener("touchmove", onTouchMove, { passive: false });
   document.body.addEventListener("touchend", onTouchEnd, { passive: false });
   document.body.addEventListener("touchcancel", onTouchEnd, { passive: false });
 
-  // Mouse drag — masaüstündə test üçün
+  // Mouse drag — masaüstü
   let mouseDown = false;
   let mouseSide = null;
   document.body.addEventListener("mousedown", (e) => {
     if (e.button !== 0) return;
     if (e.target.closest("button, .overlay__inner, dialog, .credit, .topbar, input, select, label")) return;
     mouseDown = true;
-    mouseSide = sideForX(e.clientX);
-    updatePaddle(mouseSide, e.clientY);
+    mouseSide = sideForY(e.clientY);
+    updatePaddle(mouseSide, e.clientX);
   });
   window.addEventListener("mousemove", (e) => {
-    if (mouseDown && mouseSide) updatePaddle(mouseSide, e.clientY);
+    if (mouseDown && mouseSide) updatePaddle(mouseSide, e.clientX);
   });
   window.addEventListener("mouseup", () => {
     if (mouseDown && mouseSide) state.game?.clearTouch(mouseSide);

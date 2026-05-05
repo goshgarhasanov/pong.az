@@ -9,66 +9,63 @@ import { playPaddle, playWall, playScore, playWin } from "./sound.js";
 
 // ───── Proporsional sabitlər ─────
 // Canvas hündürlüyünə görə nisbətlər; faktiki piksel ölçüləri _resize-də hesablanır.
-const PADDLE_W_RATIO     = 0.018;   // canvas_width × bu
-const PADDLE_H_RATIO     = 0.18;    // canvas_height × bu
-const PADDLE_MARGIN_RATIO= 0.025;
-const BALL_SIZE_RATIO    = 0.024;   // canvas_height × bu
-const PADDLE_SPEED_RATIO = 1.0;     // canvas_height/saniyə
-const BALL_INIT_SPEED    = 0.65;    // canvas_height/saniyə
-const BALL_MAX_SPEED     = 1.85;    // canvas_height/saniyə
-const BALL_SPEED_INC = 1.06;
+// Çubuqlar üfüqi (alt-üst), top şaquli yönlü hərəkət edir.
+const PADDLE_W_RATIO      = 0.18;    // çubuğun uzunluğu (canvas_width × bu)
+const PADDLE_H_RATIO      = 0.022;   // çubuğun qalınlığı (canvas_height × bu)
+const PADDLE_MARGIN_RATIO = 0.04;    // alt/üst kənardan məsafə
+const BALL_SIZE_RATIO     = 0.024;
+const PADDLE_SPEED_RATIO  = 1.2;     // canvas_width/saniyə (üfüqi sürət)
+const BALL_INIT_SPEED     = 0.55;    // canvas_height/saniyə (yumşaq)
+const BALL_MAX_SPEED      = 1.50;
+const BALL_SPEED_INC = 1.025;        // hər zərbədə 2.5%
 const SHAKE_DECAY = 0.86;
 
 // ───── Yardımçı ─────
 function clamp(v, min, max) { return Math.min(max, Math.max(min, v)); }
 function rand(min, max) { return Math.random() * (max - min) + min; }
 
-// ───── Paddle (raket) ─────
+// ───── Paddle (raket) — üfüqi çubuq, x boyunca hərəkət edir ─────
 class Paddle {
   constructor(side, game) {
-    this.side = side; // "left" | "right"
+    // "left" → bottom çubuq (oyunçu); "right" → top çubuq (AI / 2-ci)
+    this.side = side;
     this.game = game;
-    this.vy = 0;
+    this.vx = 0;
     this.color = side === "left" ? "#00FFFF" : "#FF00AA";
     this.resize();
   }
 
-  /** Canvas ölçüsü dəyişdikdə proporsional yenilənir. */
   resize() {
     const W = this.game.W, H = this.game.H;
-    this.w = Math.max(8, W * PADDLE_W_RATIO);
-    this.h = Math.max(60, H * PADDLE_H_RATIO);
-    const margin = Math.max(12, W * PADDLE_MARGIN_RATIO);
-    this.x = this.side === "left" ? margin : W - margin - this.w;
-    if (this.y === undefined) this.y = (H - this.h) / 2;
-    this.y = clamp(this.y, 0, H - this.h);
+    this.w = Math.max(60, W * PADDLE_W_RATIO);   // uzun ölçü
+    this.h = Math.max(8, H * PADDLE_H_RATIO);    // qalın ölçü
+    const margin = Math.max(12, H * PADDLE_MARGIN_RATIO);
+    // "left" = bottom (aşağıda), "right" = top (yuxarıda)
+    this.y = this.side === "left" ? H - margin - this.h : margin;
+    if (this.x === undefined) this.x = (W - this.w) / 2;
+    this.x = clamp(this.x, 0, W - this.w);
   }
 
   update(dt) {
-    this.y += this.vy * dt;
-    this.y = clamp(this.y, 0, this.game.H - this.h);
+    this.x += this.vx * dt;
+    this.x = clamp(this.x, 0, this.game.W - this.w);
   }
 
-  /** Hədəfə doğru yumşaq hərəkət. */
-  moveTo(targetY, dt, smooth = 0.18) {
-    const target = clamp(targetY - this.h / 2, 0, this.game.H - this.h);
-    this.y += (target - this.y) * smooth;
-  }
-
-  /** Birbaşa hədəf Y-yə yerləşdirir — toxunmaq üçün 1:1 izləmə. */
-  snapTo(targetY) {
-    const target = clamp(targetY - this.h / 2, 0, this.game.H - this.h);
-    this.y = target;
-    this.vy = 0;
+  /** Toxunma → 1:1 izləmə. */
+  snapTo(targetX) {
+    const target = clamp(targetX - this.w / 2, 0, this.game.W - this.w);
+    this.x = target;
+    this.vx = 0;
   }
 
   setVelocity(direction) {
-    this.vy = direction * PADDLE_SPEED_RATIO * this.game.H;
+    // "direction" = -1 (sol) | 0 | +1 (sağ)
+    this.vx = direction * PADDLE_SPEED_RATIO * this.game.W;
   }
 
   reset() {
-    this.y = (this.game.H - this.h) / 2;
-    this.vy = 0;
+    this.x = (this.game.W - this.w) / 2;
+    this.vx = 0;
   }
 
   draw(ctx) {
@@ -80,7 +77,7 @@ class Paddle {
     ctx.fill();
     ctx.shadowBlur = 0;
     ctx.fillStyle = "rgba(255,255,255,0.6)";
-    roundRect(ctx, this.x + 2, this.y + 2, this.w - 4, Math.min(20, this.h - 4), 4);
+    roundRect(ctx, this.x + 2, this.y + 2, Math.min(20, this.w - 4), this.h - 4, 4);
     ctx.fill();
     ctx.restore();
   }
@@ -104,9 +101,10 @@ class Ball {
     this.x = W / 2 - this.size / 2;
     this.y = H / 2 - this.size / 2;
     this.speed = BALL_INIT_SPEED * H;
+    // Şaquli yön əsas (top əsasən yuxarı/aşağı uçur)
     const angle = rand(-Math.PI / 5, Math.PI / 5);
-    this.vx = direction * Math.cos(angle) * this.speed;
-    this.vy = Math.sin(angle) * this.speed;
+    this.vy = direction * Math.cos(angle) * this.speed;
+    this.vx = Math.sin(angle) * this.speed;
     this.trail = [];
   }
 
@@ -118,26 +116,31 @@ class Ball {
     for (const p of this.trail) p.life -= dt * 4;
   }
 
-  bounceY() {
-    this.vy = -this.vy;
-    if (this.y < 0) this.y = 0;
-    if (this.y + this.size > this.game.H) this.y = this.game.H - this.size;
+  /** Sol/sağ divara dəymə (yan divarlar). */
+  bounceX() {
+    this.vx = -this.vx;
+    if (this.x < 0) this.x = 0;
+    if (this.x + this.size > this.game.W) this.x = this.game.W - this.size;
   }
 
+  /** Üfüqi çubuğa dəymə — bucağı çubuğun mərkəzinə nisbətən hesablanır. */
   bouncePaddle(paddle) {
-    const ballCenter = this.y + this.size / 2;
-    const paddleCenter = paddle.y + paddle.h / 2;
-    const offset = (ballCenter - paddleCenter) / (paddle.h / 2);
+    const ballCenter = this.x + this.size / 2;
+    const paddleCenter = paddle.x + paddle.w / 2;
+    const offset = (ballCenter - paddleCenter) / (paddle.w / 2); // [-1, 1]
     const bounceAngle = offset * (Math.PI / 3.4);
 
     const maxSpeed = BALL_MAX_SPEED * this.game.H;
     this.speed = Math.min(maxSpeed, this.speed * BALL_SPEED_INC);
-    const direction = paddle.side === "left" ? 1 : -1;
-    this.vx = direction * Math.cos(bounceAngle) * this.speed;
-    this.vy = Math.sin(bounceAngle) * this.speed;
+    // "left" = bottom çubuq → top yuxarı qayıdır (vy mənfi)
+    // "right" = top çubuq → top aşağı qayıdır (vy müsbət)
+    const direction = paddle.side === "left" ? -1 : 1;
+    this.vy = direction * Math.cos(bounceAngle) * this.speed;
+    this.vx = Math.sin(bounceAngle) * this.speed;
 
-    if (paddle.side === "left") this.x = paddle.x + paddle.w + 1;
-    else this.x = paddle.x - this.size - 1;
+    // Topu çubuqdan kənara çıxar (yapışmasın)
+    if (paddle.side === "left") this.y = paddle.y - this.size - 1;       // bottom
+    else this.y = paddle.y + paddle.h + 1;                                // top
   }
 
   draw(ctx, withTrail = true) {
@@ -212,7 +215,6 @@ class AI {
   setDifficulty(d) { this.difficulty = d; }
 
   update(dt) {
-    // Çətinliyə görə reaksiya gecikməsi və hədəf dəqiqliyi.
     const cfg = {
       easy:        { reactSpeed: 0.06, jitterAmp: 80,  predict: false, errChance: 0.20 },
       medium:      { reactSpeed: 0.12, jitterAmp: 35,  predict: false, errChance: 0.06 },
@@ -220,50 +222,49 @@ class AI {
       impossible:  { reactSpeed: 0.42, jitterAmp: 0,   predict: true,  errChance: 0.0  },
     }[this.difficulty] || {};
 
-    // Jitter — vaxtaşırı hədəfi azacıq dəyişdirir
     this._jitterTimer -= dt;
     if (this._jitterTimer <= 0) {
       this._jitter = rand(-cfg.jitterAmp, cfg.jitterAmp);
       this._jitterTimer = rand(0.4, 1.2);
     }
 
-    // Hədəf Y — top və ya proqnoz nöqtəsi
-    let targetY;
-    if (cfg.predict && this.ball.vx > 0) {
-      targetY = this._predictBallY();
+    // AI top çubuq — hədəf X mövqeyi (top yuxarı doğru gəlirsə proqnoz)
+    let targetX;
+    if (cfg.predict && this.ball.vy < 0) {
+      targetX = this._predictBallX();
     } else {
-      targetY = this.ball.y + this.ball.size / 2;
+      targetX = this.ball.x + this.ball.size / 2;
     }
-    targetY += this._jitter;
+    targetX += this._jitter;
 
-    // Səhv etmə şansı (lap ortada qalır)
     if (Math.random() < cfg.errChance) {
-      targetY = this.paddle.y + this.paddle.h / 2;
+      targetX = this.paddle.x + this.paddle.w / 2;
     }
 
-    const H = this.paddle.game.H;
-    const target = clamp(targetY - this.paddle.h / 2, 0, H - this.paddle.h);
-    this.paddle.y += (target - this.paddle.y) * cfg.reactSpeed;
+    const W = this.paddle.game.W;
+    const target = clamp(targetX - this.paddle.w / 2, 0, W - this.paddle.w);
+    this.paddle.x += (target - this.paddle.x) * cfg.reactSpeed;
   }
 
-  /** Topun haradan keçəcəyini divar əks-sədası ilə proqnozlaşdırır. */
-  _predictBallY() {
-    const H = this.paddle.game.H;
+  /** Topun haradan keçəcəyini divar əks-sədası ilə proqnozlaşdırır (X). */
+  _predictBallX() {
+    const W = this.paddle.game.W;
     let x = this.ball.x;
     let y = this.ball.y;
     let vx = this.ball.vx;
     let vy = this.ball.vy;
-    const targetX = this.paddle.x;
+    const targetY = this.paddle.y + this.paddle.h;  // top çubuğun aşağı kənarı
     let safety = 200;
-    while (vx > 0 && x < targetX && safety-- > 0) {
-      const stepX = Math.min(8, targetX - x);
-      const t = stepX / vx;
+    // Top yuxarı uçur (vy < 0); paddle.y-yə çatana qədər
+    while (vy < 0 && y > targetY && safety-- > 0) {
+      const stepY = Math.max(-8, targetY - y);
+      const t = stepY / vy;
       x += vx * t;
       y += vy * t;
-      if (y < 0) { y = -y; vy = -vy; }
-      if (y + this.ball.size > H) { y = (H - this.ball.size) - (y + this.ball.size - H); vy = -vy; }
+      if (x < 0) { x = -x; vx = -vx; }
+      if (x + this.ball.size > W) { x = (W - this.ball.size) - (x + this.ball.size - W); vx = -vx; }
     }
-    return y + this.ball.size / 2;
+    return x + this.ball.size / 2;
   }
 }
 
@@ -320,7 +321,7 @@ export class Game {
     this.lastTs = 0;
 
     this.input = { up: false, down: false, leftUp: false, leftDown: false };
-    this.touchY = { left: null, right: null };
+    this.touchX = { left: null, right: null };  // X mövqe (üfüqi çubuq)
 
     this._onScore = options.onScore || (() => {});
     this._onGameOver = options.onGameOver || (() => {});
@@ -387,30 +388,28 @@ export class Game {
     }
   }
 
-  // ───── Toxunma giriş — y koordinatını CSS-dən logical-a çevirmək ─────
-  setTouchY(side, cssY) {
-    // Logical = CSS-ə bərabərdir, ona görə birbaşa istifadə
-    this.touchY[side] = clamp(cssY, 0, this.H);
+  // ───── Toxunma giriş — barmağın X mövqeyinə görə çubuq hərəkəti ─────
+  setTouchX(side, cssX) {
+    this.touchX[side] = clamp(cssX, 0, this.W);
   }
+  // Geriyə uyğunluq üçün — köhnə main.js setTouchY çağırır; X kimi qəbul edirik
+  setTouchY(side, cssX) { this.setTouchX(side, cssX); }
 
-  clearTouch(side) { this.touchY[side] = null; }
+  clearTouch(side) { this.touchX[side] = null; }
 
-  // ───── Klaviatura input ─────
   setInput(key, isDown) {
     this.input[key] = isDown;
   }
 
-  // ───── Update ─────
   _updatePaddles(dt) {
-    // Sol raket — həmişə insan
-    if (this.touchY.left !== null) {
-      // Toxunma → 1:1 izləmə (smoothing yox)
-      this.left.snapTo(this.touchY.left);
+    // Bottom çubuq (left = oyunçu, ən aşağıda)
+    if (this.touchX.left !== null) {
+      this.left.snapTo(this.touchX.left);
     } else {
       let dir = 0;
+      // input.up/down klaviatura mapping-i — sol/sağ kimi şərh olunur
       if (this.input.leftUp) dir -= 1;
       if (this.input.leftDown) dir += 1;
-      // Eyni zamanda Up/Down ümumi-də sol raketi idarə edir (PvP olmadıqda)
       if (this.options.mode !== "pvp") {
         if (this.input.up) dir -= 1;
         if (this.input.down) dir += 1;
@@ -419,11 +418,10 @@ export class Game {
       this.left.update(dt);
     }
 
-    // Sağ raket — AI və ya 2-ci insan
+    // Top çubuq (right = AI və ya 2-ci insan, ən yuxarıda)
     if (this.options.mode === "pvp") {
-      if (this.touchY.right !== null) {
-        // Toxunma → 1:1 izləmə (smoothing yox)
-        this.right.snapTo(this.touchY.right);
+      if (this.touchX.right !== null) {
+        this.right.snapTo(this.touchX.right);
       } else {
         let dir = 0;
         if (this.input.up) dir -= 1;
@@ -440,35 +438,37 @@ export class Game {
     this.ball.update(dt);
     const H = this.H, W = this.W;
 
-    // Üst/alt divar
-    if (this.ball.y <= 0 || this.ball.y + this.ball.size >= H) {
-      this.ball.bounceY();
+    // Sol/sağ divar (yan divarlar)
+    if (this.ball.x <= 0 || this.ball.x + this.ball.size >= W) {
+      this.ball.bounceX();
       playWall();
-      this._spark(this.ball.x + this.ball.size / 2, this.ball.y < H / 2 ? 0 : H, "#FFFFFF", 8);
+      this._spark(this.ball.x < W / 2 ? 0 : W, this.ball.y + this.ball.size / 2, "#FFFFFF", 8);
       this.shake = Math.max(this.shake, 4);
     }
 
-    // Raket toqquşması — sürət canvas hündürlüyünə nisbətdə hesablanır
+    // Üfüqi çubuq toqquşması
     const speedRel = this.ball.speed / this.H * 10;
-    if (this._collidePaddle(this.left)) {
+    if (this._collidePaddle(this.left)) {           // bottom çubuq
       this.ball.bouncePaddle(this.left);
       playPaddle(speedRel);
-      if (this.options.particles) this._spark(this.ball.x, this.ball.y + this.ball.size / 2, this.left.color, 24);
+      if (this.options.particles) this._spark(this.ball.x + this.ball.size / 2, this.ball.y, this.left.color, 24);
       if (this.options.shake) this.shake = Math.max(this.shake, 12);
       this.flash = 0.35;
-    } else if (this._collidePaddle(this.right)) {
+    } else if (this._collidePaddle(this.right)) {   // top çubuq
       this.ball.bouncePaddle(this.right);
       playPaddle(speedRel);
-      if (this.options.particles) this._spark(this.ball.x + this.ball.size, this.ball.y + this.ball.size / 2, this.right.color, 24);
+      if (this.options.particles) this._spark(this.ball.x + this.ball.size / 2, this.ball.y + this.ball.size, this.right.color, 24);
       if (this.options.shake) this.shake = Math.max(this.shake, 12);
       this.flash = 0.35;
     }
 
-    // Qol
-    if (this.ball.x + this.ball.size < 0) {
-      this._scored("right");
-    } else if (this.ball.x > W) {
+    // Qol — top alt/üst kənardan keçirsə
+    if (this.ball.y + this.ball.size < 0) {
+      // Top yuxarıdan çıxıb → bottom (left) qol vurdu
       this._scored("left");
+    } else if (this.ball.y > H) {
+      // Top aşağıdan çıxıb → top (right) qol vurdu
+      this._scored("right");
     }
   }
 
@@ -532,12 +532,12 @@ export class Game {
     // Yalnız sarsıntı offset-i tətbiq edirik (letterbox yoxdur)
     ctx.translate((Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake);
 
-    // Mərkəzi nöqtəli xətt (canvas hündürlüyünə nisbətdə)
+    // Mərkəzi üfüqi nöqtəli xətt (canvas hündürlüyünün ortasında)
     ctx.fillStyle = "rgba(255,255,255,0.12)";
-    const dotSize = Math.max(4, H * 0.008);
-    const gap = Math.max(14, H * 0.03);
-    for (let y = 10; y < H - 10; y += gap) {
-      ctx.fillRect(W / 2 - dotSize / 2, y, dotSize, dotSize * 0.6);
+    const dotSize = Math.max(4, W * 0.008);
+    const gap = Math.max(14, W * 0.03);
+    for (let x = 10; x < W - 10; x += gap) {
+      ctx.fillRect(x, H / 2 - dotSize / 2, dotSize * 0.6, dotSize);
     }
 
     // Mərkəzi dairə
