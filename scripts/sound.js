@@ -55,11 +55,64 @@ function sweep(fromFreq, toFreq, durMs, { type = "sawtooth", volume = 0.25 } = {
   osc.stop(now + durMs / 1000 + 0.05);
 }
 
-/** Topun raketdən əks-səda səsi — sürətə görə tonu dəyişir. */
+/** Topun raketdən əks-səda səsi — dəmir-üzərinə-zərbə effekti.
+ *
+ * 3 harmonika qatılır + qısa noise burst → metalik clang təsiri.
+ * Fundamental sürətə görə dəyişir (380-1100 Hz).
+ */
 export function playPaddle(speed = 1) {
-  const base = 320 + Math.min(800, speed * 30);
-  tone(base, 80, { type: "square", volume: 0.18, release: 30 });
-  tone(base * 1.5, 50, { type: "sine", volume: 0.10, release: 30 });
+  if (!enabled) return;
+  const c = ensureCtx();
+  if (!c) return;
+  const now = c.currentTime;
+
+  const fundamental = 380 + Math.min(720, speed * 32);
+
+  // 1) Fundamental — metal lövhə əsas tonu (sharp attack)
+  _metalTone(fundamental, 0.20, 0.18, "triangle");
+  // 2) 2-ci harmonika — yuxarı parıltı
+  _metalTone(fundamental * 2.18, 0.13, 0.12, "sine");
+  // 3) 3-cü harmonika — daha yuxarı, daha qısa
+  _metalTone(fundamental * 3.4, 0.08, 0.08, "sine");
+
+  // 4) Klik — ani noise burst (pərçim kimi)
+  const bufLen = Math.floor(c.sampleRate * 0.04);
+  const buffer = c.createBuffer(1, bufLen, c.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < bufLen; i++) {
+    data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufLen, 3);
+  }
+  const noise = c.createBufferSource();
+  noise.buffer = buffer;
+  const noiseGain = c.createGain();
+  noiseGain.gain.setValueAtTime(0.20, now);
+  noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
+  // Yüksək keçid filtri ilə "tıkıltı" daha sərt görünər
+  const filter = c.createBiquadFilter();
+  filter.type = "highpass";
+  filter.frequency.value = 1800;
+  noise.connect(filter).connect(noiseGain).connect(masterGain);
+  noise.start(now);
+  noise.stop(now + 0.06);
+}
+
+/** Daxili: metal-style ton (sharp attack + exponential decay). */
+function _metalTone(freq, durSec, vol, type = "triangle") {
+  const c = ensureCtx();
+  if (!c) return;
+  const now = c.currentTime;
+  const osc = c.createOscillator();
+  const gain = c.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, now);
+  // Ani pitch düşmə (metalin "ring" effekti)
+  osc.frequency.exponentialRampToValueAtTime(freq * 0.96, now + durSec);
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(vol, now + 0.002);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + durSec);
+  osc.connect(gain).connect(masterGain);
+  osc.start(now);
+  osc.stop(now + durSec + 0.05);
 }
 
 /** Topun divara dəyməsi. */

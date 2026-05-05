@@ -1,23 +1,22 @@
 // ════════════════════════════════════════════════════════════
 //  Pong oyununun bütün məntiqi və canvas render-i
-//  - Logical resolution: 1280×720 (16:9)
-//  - Ekran ölçüsünə uyğunlaşır, daxili koordinatlar sabit qalır
+//  - Tam responsive: canvas-ın ölçüsünə uyğun proporsional rendering
+//  - Heç bir letterbox yoxdur — bütün ekran istifadə olunur
 //  - Top, raketlər, AI, qığılcımlar, ekran sarsıntısı
 // ════════════════════════════════════════════════════════════
 
 import { playPaddle, playWall, playScore, playWin } from "./sound.js";
 
-// ───── Sabitlər ─────
-export const W = 1280;            // Logical en
-export const H = 720;             // Logical hündürlük
-const PADDLE_W = 14;
-const PADDLE_H = 110;
-const PADDLE_MARGIN = 28;
-const PADDLE_SPEED = 720;         // px/saniyə
-const BALL_SIZE = 14;
-const BALL_INIT_SPEED = 460;      // px/saniyə
-const BALL_MAX_SPEED = 1300;
-const BALL_SPEED_INC = 1.06;      // hər raketə dəydikdə
+// ───── Proporsional sabitlər ─────
+// Canvas hündürlüyünə görə nisbətlər; faktiki piksel ölçüləri _resize-də hesablanır.
+const PADDLE_W_RATIO     = 0.018;   // canvas_width × bu
+const PADDLE_H_RATIO     = 0.18;    // canvas_height × bu
+const PADDLE_MARGIN_RATIO= 0.025;
+const BALL_SIZE_RATIO    = 0.024;   // canvas_height × bu
+const PADDLE_SPEED_RATIO = 1.0;     // canvas_height/saniyə
+const BALL_INIT_SPEED    = 0.65;    // canvas_height/saniyə
+const BALL_MAX_SPEED     = 1.85;    // canvas_height/saniyə
+const BALL_SPEED_INC = 1.06;
 const SHAKE_DECAY = 0.86;
 
 // ───── Yardımçı ─────
@@ -26,45 +25,59 @@ function rand(min, max) { return Math.random() * (max - min) + min; }
 
 // ───── Paddle (raket) ─────
 class Paddle {
-  constructor(side) {
+  constructor(side, game) {
     this.side = side; // "left" | "right"
-    this.x = side === "left" ? PADDLE_MARGIN : W - PADDLE_MARGIN - PADDLE_W;
-    this.y = (H - PADDLE_H) / 2;
-    this.w = PADDLE_W;
-    this.h = PADDLE_H;
+    this.game = game;
     this.vy = 0;
     this.color = side === "left" ? "#00FFFF" : "#FF00AA";
+    this.resize();
+  }
+
+  /** Canvas ölçüsü dəyişdikdə proporsional yenilənir. */
+  resize() {
+    const W = this.game.W, H = this.game.H;
+    this.w = Math.max(8, W * PADDLE_W_RATIO);
+    this.h = Math.max(60, H * PADDLE_H_RATIO);
+    const margin = Math.max(12, W * PADDLE_MARGIN_RATIO);
+    this.x = this.side === "left" ? margin : W - margin - this.w;
+    if (this.y === undefined) this.y = (H - this.h) / 2;
+    this.y = clamp(this.y, 0, H - this.h);
   }
 
   update(dt) {
     this.y += this.vy * dt;
-    this.y = clamp(this.y, 0, H - this.h);
+    this.y = clamp(this.y, 0, this.game.H - this.h);
   }
 
-  /** Hədəfə doğru yumşaq hərəkət (input-əsaslı). */
+  /** Hədəfə doğru yumşaq hərəkət. */
   moveTo(targetY, dt, smooth = 0.18) {
-    const target = clamp(targetY - this.h / 2, 0, H - this.h);
+    const target = clamp(targetY - this.h / 2, 0, this.game.H - this.h);
     this.y += (target - this.y) * smooth;
   }
 
+  /** Birbaşa hədəf Y-yə yerləşdirir — toxunmaq üçün 1:1 izləmə. */
+  snapTo(targetY) {
+    const target = clamp(targetY - this.h / 2, 0, this.game.H - this.h);
+    this.y = target;
+    this.vy = 0;
+  }
+
   setVelocity(direction) {
-    this.vy = direction * PADDLE_SPEED;
+    this.vy = direction * PADDLE_SPEED_RATIO * this.game.H;
   }
 
   reset() {
-    this.y = (H - PADDLE_H) / 2;
+    this.y = (this.game.H - this.h) / 2;
     this.vy = 0;
   }
 
   draw(ctx) {
     ctx.save();
-    // Glow
     ctx.shadowColor = this.color;
     ctx.shadowBlur = 24;
     ctx.fillStyle = this.color;
     roundRect(ctx, this.x, this.y, this.w, this.h, 6);
     ctx.fill();
-    // İçəri parıltı
     ctx.shadowBlur = 0;
     ctx.fillStyle = "rgba(255,255,255,0.6)";
     roundRect(ctx, this.x + 2, this.y + 2, this.w - 4, Math.min(20, this.h - 4), 4);
@@ -75,16 +88,22 @@ class Paddle {
 
 // ───── Top ─────
 class Ball {
-  constructor() {
-    this.size = BALL_SIZE;
+  constructor(game) {
+    this.game = game;
     this.trail = [];
+    this.resize();
     this.reset();
   }
 
+  resize() {
+    this.size = Math.max(8, this.game.H * BALL_SIZE_RATIO);
+  }
+
   reset(direction = Math.random() < 0.5 ? -1 : 1) {
+    const W = this.game.W, H = this.game.H;
     this.x = W / 2 - this.size / 2;
     this.y = H / 2 - this.size / 2;
-    this.speed = BALL_INIT_SPEED;
+    this.speed = BALL_INIT_SPEED * H;
     const angle = rand(-Math.PI / 5, Math.PI / 5);
     this.vx = direction * Math.cos(angle) * this.speed;
     this.vy = Math.sin(angle) * this.speed;
@@ -94,7 +113,6 @@ class Ball {
   update(dt) {
     this.x += this.vx * dt;
     this.y += this.vy * dt;
-    // İz
     this.trail.push({ x: this.x, y: this.y, life: 1 });
     if (this.trail.length > 18) this.trail.shift();
     for (const p of this.trail) p.life -= dt * 4;
@@ -102,24 +120,22 @@ class Ball {
 
   bounceY() {
     this.vy = -this.vy;
-    // Toplun divara dəymə nöqtəsində kiçik düzəliş
     if (this.y < 0) this.y = 0;
-    if (this.y + this.size > H) this.y = H - this.size;
+    if (this.y + this.size > this.game.H) this.y = this.game.H - this.size;
   }
 
-  /** Raketdən əks-səda — bucağı raketin mərkəzinə nisbətən hesablanır. */
   bouncePaddle(paddle) {
     const ballCenter = this.y + this.size / 2;
     const paddleCenter = paddle.y + paddle.h / 2;
-    const offset = (ballCenter - paddleCenter) / (paddle.h / 2); // [-1, 1]
-    const bounceAngle = offset * (Math.PI / 3.4); // ±~53°
+    const offset = (ballCenter - paddleCenter) / (paddle.h / 2);
+    const bounceAngle = offset * (Math.PI / 3.4);
 
-    this.speed = Math.min(BALL_MAX_SPEED, this.speed * BALL_SPEED_INC);
+    const maxSpeed = BALL_MAX_SPEED * this.game.H;
+    this.speed = Math.min(maxSpeed, this.speed * BALL_SPEED_INC);
     const direction = paddle.side === "left" ? 1 : -1;
     this.vx = direction * Math.cos(bounceAngle) * this.speed;
     this.vy = Math.sin(bounceAngle) * this.speed;
 
-    // Topu raketdən kənara çıxar (yapışmasın)
     if (paddle.side === "left") this.x = paddle.x + paddle.w + 1;
     else this.x = paddle.x - this.size - 1;
   }
@@ -225,13 +241,14 @@ class AI {
       targetY = this.paddle.y + this.paddle.h / 2;
     }
 
-    // Yumşaq hərəkət
+    const H = this.paddle.game.H;
     const target = clamp(targetY - this.paddle.h / 2, 0, H - this.paddle.h);
     this.paddle.y += (target - this.paddle.y) * cfg.reactSpeed;
   }
 
   /** Topun haradan keçəcəyini divar əks-sədası ilə proqnozlaşdırır. */
   _predictBallY() {
+    const H = this.paddle.game.H;
     let x = this.ball.x;
     let y = this.ball.y;
     let vx = this.ball.vx;
@@ -277,23 +294,30 @@ export class Game {
       ...options,
     };
 
-    this.left = new Paddle("left");
-    this.right = new Paddle("right");
-    this.ball = new Ball();
+    // Logical W/H — _resize-də canvas ölçüsünə bərabər təyin olunur
+    this.W = 1280;
+    this.H = 720;
+    this.cssWidth = 0;
+    this.cssHeight = 0;
+    this.dpr = 1;
+
+    // Əvvəl canvas ölçüsünü oxuyub W/H təyin edirik
+    this._resize(/* skipPaddleResize */ true);
+
+    this.left = new Paddle("left", this);
+    this.right = new Paddle("right", this);
+    this.ball = new Ball(this);
     this.ai = new AI(this.right, this.ball, this.options.difficulty);
 
     this.scoreLeft = 0;
     this.scoreRight = 0;
     this.particles = [];
     this.shake = 0;
-    this.flash = 0;          // ekrana qısa flash effekt
-    this.state = "menu";     // menu | playing | paused | scored | gameover
-    this.scoredTimer = 0;    // xal sonrası kiçik fasilə
+    this.flash = 0;
+    this.state = "menu";
+    this.scoredTimer = 0;
     this.winner = null;
     this.lastTs = 0;
-    this.cssWidth = 0;
-    this.cssHeight = 0;
-    this.dpr = 1;
 
     this.input = { up: false, down: false, leftUp: false, leftDown: false };
     this.touchY = { left: null, right: null };
@@ -302,8 +326,8 @@ export class Game {
     this._onGameOver = options.onGameOver || (() => {});
 
     this._loop = this._loop.bind(this);
-    this._resize();
     window.addEventListener("resize", () => this._resize());
+    window.addEventListener("orientationchange", () => setTimeout(() => this._resize(), 100));
   }
 
   setOption(key, value) {
@@ -342,32 +366,31 @@ export class Game {
     else if (this.state === "paused") this.resume();
   }
 
-  // ───── Resize ─────
-  _resize() {
+  // ───── Resize — letterbox-suz, canvas tam ekran istifadə edir ─────
+  _resize(skipPaddleResize = false) {
     const rect = this.canvas.getBoundingClientRect();
     this.dpr = Math.min(2, window.devicePixelRatio || 1);
     this.cssWidth = rect.width;
     this.cssHeight = rect.height;
-    this.canvas.width = Math.floor(rect.width * this.dpr);
-    this.canvas.height = Math.floor(rect.height * this.dpr);
-  }
+    this.canvas.width = Math.max(1, Math.floor(rect.width * this.dpr));
+    this.canvas.height = Math.max(1, Math.floor(rect.height * this.dpr));
 
-  // ───── Logical → screen mapping ─────
-  _scale() {
-    // Letterbox: tam W×H sığdırırıq, kənarlarda boşluq qalır
-    const sx = this.cssWidth / W;
-    const sy = this.cssHeight / H;
-    const s = Math.min(sx, sy);
-    const offX = (this.cssWidth - W * s) / 2;
-    const offY = (this.cssHeight - H * s) / 2;
-    return { s, offX, offY };
+    // Logical W/H = CSS pixel ölçüsü (1:1 mapping, heç bir letterbox yoxdur)
+    this.W = Math.max(320, rect.width);
+    this.H = Math.max(240, rect.height);
+
+    // Paddle/ball ölçülərini yenidən hesabla
+    if (!skipPaddleResize) {
+      if (this.left) this.left.resize();
+      if (this.right) this.right.resize();
+      if (this.ball) this.ball.resize();
+    }
   }
 
   // ───── Toxunma giriş — y koordinatını CSS-dən logical-a çevirmək ─────
   setTouchY(side, cssY) {
-    const { s, offY } = this._scale();
-    const localY = (cssY - offY) / s;
-    this.touchY[side] = clamp(localY, 0, H);
+    // Logical = CSS-ə bərabərdir, ona görə birbaşa istifadə
+    this.touchY[side] = clamp(cssY, 0, this.H);
   }
 
   clearTouch(side) { this.touchY[side] = null; }
@@ -381,7 +404,8 @@ export class Game {
   _updatePaddles(dt) {
     // Sol raket — həmişə insan
     if (this.touchY.left !== null) {
-      this.left.moveTo(this.touchY.left, dt, 0.32);
+      // Toxunma → 1:1 izləmə (smoothing yox)
+      this.left.snapTo(this.touchY.left);
     } else {
       let dir = 0;
       if (this.input.leftUp) dir -= 1;
@@ -398,7 +422,8 @@ export class Game {
     // Sağ raket — AI və ya 2-ci insan
     if (this.options.mode === "pvp") {
       if (this.touchY.right !== null) {
-        this.right.moveTo(this.touchY.right, dt, 0.32);
+        // Toxunma → 1:1 izləmə (smoothing yox)
+        this.right.snapTo(this.touchY.right);
       } else {
         let dir = 0;
         if (this.input.up) dir -= 1;
@@ -413,6 +438,7 @@ export class Game {
 
   _updateBall(dt) {
     this.ball.update(dt);
+    const H = this.H, W = this.W;
 
     // Üst/alt divar
     if (this.ball.y <= 0 || this.ball.y + this.ball.size >= H) {
@@ -422,19 +448,20 @@ export class Game {
       this.shake = Math.max(this.shake, 4);
     }
 
-    // Raket toqquşması
+    // Raket toqquşması — sürət canvas hündürlüyünə nisbətdə hesablanır
+    const speedRel = this.ball.speed / this.H * 10;
     if (this._collidePaddle(this.left)) {
       this.ball.bouncePaddle(this.left);
-      playPaddle(this.ball.speed / 100);
-      if (this.options.particles) this._spark(this.ball.x, this.ball.y + this.ball.size / 2, this.left.color, 22);
-      if (this.options.shake) this.shake = Math.max(this.shake, 10);
-      this.flash = 0.3;
+      playPaddle(speedRel);
+      if (this.options.particles) this._spark(this.ball.x, this.ball.y + this.ball.size / 2, this.left.color, 24);
+      if (this.options.shake) this.shake = Math.max(this.shake, 12);
+      this.flash = 0.35;
     } else if (this._collidePaddle(this.right)) {
       this.ball.bouncePaddle(this.right);
-      playPaddle(this.ball.speed / 100);
-      if (this.options.particles) this._spark(this.ball.x + this.ball.size, this.ball.y + this.ball.size / 2, this.right.color, 22);
-      if (this.options.shake) this.shake = Math.max(this.shake, 10);
-      this.flash = 0.3;
+      playPaddle(speedRel);
+      if (this.options.particles) this._spark(this.ball.x + this.ball.size, this.ball.y + this.ball.size / 2, this.right.color, 24);
+      if (this.options.shake) this.shake = Math.max(this.shake, 12);
+      this.flash = 0.35;
     }
 
     // Qol
@@ -491,26 +518,24 @@ export class Game {
     }
   }
 
-  // ───── Render ─────
+  // ───── Render — letterbox-suz, full-screen ─────
   _draw() {
     const ctx = this.ctx;
+    const W = this.W, H = this.H;
     ctx.save();
     ctx.scale(this.dpr, this.dpr);
     ctx.clearRect(0, 0, this.cssWidth, this.cssHeight);
 
-    // Letterbox arxa fonu
     ctx.fillStyle = "#000000";
     ctx.fillRect(0, 0, this.cssWidth, this.cssHeight);
 
-    // Logical sahəyə keçid
-    const { s, offX, offY } = this._scale();
-    ctx.translate(offX + (Math.random() - 0.5) * this.shake, offY + (Math.random() - 0.5) * this.shake);
-    ctx.scale(s, s);
+    // Yalnız sarsıntı offset-i tətbiq edirik (letterbox yoxdur)
+    ctx.translate((Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake);
 
-    // Mərkəzi xətt (şıltaq nöqtələr)
+    // Mərkəzi nöqtəli xətt (canvas hündürlüyünə nisbətdə)
     ctx.fillStyle = "rgba(255,255,255,0.12)";
-    const dotSize = 6;
-    const gap = 22;
+    const dotSize = Math.max(4, H * 0.008);
+    const gap = Math.max(14, H * 0.03);
     for (let y = 10; y < H - 10; y += gap) {
       ctx.fillRect(W / 2 - dotSize / 2, y, dotSize, dotSize * 0.6);
     }
@@ -519,7 +544,7 @@ export class Game {
     ctx.strokeStyle = "rgba(255,255,255,0.06)";
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(W / 2, H / 2, 110, 0, Math.PI * 2);
+    ctx.arc(W / 2, H / 2, Math.min(W, H) * 0.15, 0, Math.PI * 2);
     ctx.stroke();
 
     // Top
@@ -542,7 +567,6 @@ export class Game {
 
     ctx.restore();
 
-    // Sarsıntı zəifləyir
     this.shake *= SHAKE_DECAY;
     if (this.shake < 0.2) this.shake = 0;
     this.flash *= 0.86;

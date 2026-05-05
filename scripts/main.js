@@ -167,48 +167,91 @@ function bindKeyboard() {
   });
 }
 
-// ───── Toxunma — bağlama ─────
+// ───── Toxunma — bağlama (multi-touch, gecikməsiz) ─────
+//
+// Strategiya:
+//  • PvC rejimi: ekranın istənilən nöqtəsindən sol raket idarə olunur
+//    (rəqib tərəfindən belə — barmağı orada saxlasan da işləyir).
+//  • PvP rejimi: ekranın sol yarısı sol raket, sağ yarısı sağ raket;
+//    eyni anda iki barmaq işlənə bilər.
+//  • Touch event-ləri stage-də capture edilir, paddle birbaşa
+//    barmağın Y mövqeyinə yapışdırılır (heç bir smoothing).
 function bindTouch() {
-  function attach(el, side) {
-    let active = false;
-    const onMove = (clientY) => {
-      const rect = dom.canvas.getBoundingClientRect();
-      const cssY = clientY - rect.top;
-      state.game?.setTouchY(side, cssY);
-    };
-    el.addEventListener("touchstart", (e) => {
-      e.preventDefault();
-      active = true;
-      resumeAudio();
-      if (state.game?.state === "menu" || state.game?.state === "gameover" || !state.game) startGame();
-      onMove(e.touches[0].clientY);
-    }, { passive: false });
-    el.addEventListener("touchmove", (e) => {
-      if (!active) return;
-      e.preventDefault();
-      onMove(e.touches[0].clientY);
-    }, { passive: false });
-    el.addEventListener("touchend", () => {
-      active = false;
-      state.game?.clearTouch(side);
-    });
+  // Hər aktiv touch ID-si → idarə etdiyi tərəf
+  const activeTouches = new Map();
 
-    // Mouse drag (PvP simulyasiyası üçün masaüstü)
-    let mouseDown = false;
-    el.addEventListener("mousedown", (e) => {
-      mouseDown = true;
-      onMove(e.clientY);
-    });
-    window.addEventListener("mousemove", (e) => {
-      if (mouseDown) onMove(e.clientY);
-    });
-    window.addEventListener("mouseup", () => {
-      mouseDown = false;
-      state.game?.clearTouch(side);
-    });
-  }
-  attach(dom.touchLeft, "left");
-  attach(dom.touchRight, "right");
+  const sideForX = (clientX) => {
+    if (state.settings.mode === "pvp") {
+      const rect = dom.canvas.getBoundingClientRect();
+      return clientX < rect.left + rect.width / 2 ? "left" : "right";
+    }
+    return "left";
+  };
+
+  const updatePaddle = (side, clientY) => {
+    const rect = dom.canvas.getBoundingClientRect();
+    const cssY = clientY - rect.top;
+    state.game?.setTouchY(side, cssY);
+  };
+
+  const onTouchStart = (e) => {
+    if (e.target.closest("button, .overlay__inner, dialog, .credit, .topbar")) return;
+    e.preventDefault();
+    resumeAudio();
+    if (!state.game || state.game.state === "menu" || state.game.state === "gameover") {
+      startGame();
+    }
+    for (const t of e.changedTouches) {
+      const side = sideForX(t.clientX);
+      activeTouches.set(t.identifier, side);
+      updatePaddle(side, t.clientY);
+    }
+  };
+
+  const onTouchMove = (e) => {
+    if (activeTouches.size === 0) return;
+    e.preventDefault();
+    for (const t of e.changedTouches) {
+      const side = activeTouches.get(t.identifier);
+      if (side) updatePaddle(side, t.clientY);
+    }
+  };
+
+  const onTouchEnd = (e) => {
+    for (const t of e.changedTouches) {
+      const side = activeTouches.get(t.identifier);
+      if (side) {
+        activeTouches.delete(t.identifier);
+        const stillActive = [...activeTouches.values()].includes(side);
+        if (!stillActive) state.game?.clearTouch(side);
+      }
+    }
+  };
+
+  // Body-yə bağlayırıq — istənilən nöqtəyə toxun
+  document.body.addEventListener("touchstart", onTouchStart, { passive: false });
+  document.body.addEventListener("touchmove", onTouchMove, { passive: false });
+  document.body.addEventListener("touchend", onTouchEnd, { passive: false });
+  document.body.addEventListener("touchcancel", onTouchEnd, { passive: false });
+
+  // Mouse drag — masaüstündə test üçün
+  let mouseDown = false;
+  let mouseSide = null;
+  document.body.addEventListener("mousedown", (e) => {
+    if (e.button !== 0) return;
+    if (e.target.closest("button, .overlay__inner, dialog, .credit, .topbar, input, select, label")) return;
+    mouseDown = true;
+    mouseSide = sideForX(e.clientX);
+    updatePaddle(mouseSide, e.clientY);
+  });
+  window.addEventListener("mousemove", (e) => {
+    if (mouseDown && mouseSide) updatePaddle(mouseSide, e.clientY);
+  });
+  window.addEventListener("mouseup", () => {
+    if (mouseDown && mouseSide) state.game?.clearTouch(mouseSide);
+    mouseDown = false;
+    mouseSide = null;
+  });
 }
 
 // ───── Tənzimləmələr modal ─────
