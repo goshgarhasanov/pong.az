@@ -679,8 +679,8 @@ body::before {
   .score__name { font-size: 10px; letter-spacing: 0.12em; }
   .score__sep { font-size: 10px; }
 
-  /* Stage maksimum yer alır */
-  .stage { padding: 0; }
+  /* Mobildə zoom-u azacıq azaltmaq üçün kiçik padding əlavə edirik */
+  .stage { padding: 8px 6px; }
 
   /* Overlay-lar kompakt */
   .overlay__title { font-size: 38px; letter-spacing: 2px; }
