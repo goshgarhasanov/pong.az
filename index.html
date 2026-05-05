@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="description" content="Pong.az — klassik Pong oyununun neon dark versiyası. AI rəqib, qığılcım effektləri, screen-shake, Web Audio səslər." />
+  <title>Pong.az · Neon Pong</title>
+
+  <link rel="icon" type="image/svg+xml" href="assets/icons/favicon.svg" />
+  <link rel="manifest" href="manifest.webmanifest" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700;800&display=swap" />
+
+  <link rel="stylesheet" href="styles/style.css" />
+</head>
+<body>
+
+  <div class="fx-vignette" aria-hidden="true"></div>
+  <div class="fx-scanlines" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand__bar brand__bar--left"></span>
+      <span class="brand__name">PONG<span class="brand__dot">.</span>az</span>
+      <span class="brand__bar brand__bar--right"></span>
+    </div>
+    <nav class="topbar__actions" aria-label="Alətlər">
+      <button id="btn-pause" class="icon-btn" title="Dayandır (P və ya Space)" aria-label="Dayandır">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="6" y="5" width="4" height="14" rx="1.5" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1.5" fill="currentColor"/></svg>
+      </button>
+      <button id="btn-sound" class="icon-btn" title="Səs" aria-label="Səs">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+      </button>
+      <button id="btn-settings" class="icon-btn" title="Tənzimləmələr" aria-label="Tənzimləmələr">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </nav>
+  </header>
+
+  <div class="scoreboard" aria-live="polite">
+    <div class="score score--left">
+      <span class="score__name" id="name-left">SƏN</span>
+      <span class="score__value" id="score-left">0</span>
+    </div>
+    <span class="score__sep">VS</span>
+    <div class="score score--right">
+      <span class="score__value" id="score-right">0</span>
+      <span class="score__name" id="name-right">AI</span>
+    </div>
+  </div>
+
+  <main class="stage">
+    <canvas id="canvas" aria-label="Pong oyun sahəsi"></canvas>
+
+    <div class="overlay" id="overlay">
+      <div class="overlay__inner">
+        <div class="overlay__logo">
+          <span class="overlay__bar overlay__bar--left"></span>
+          <h1 class="overlay__title">PONG<span class="overlay__title-dot">.</span>az</h1>
+          <span class="overlay__bar overlay__bar--right"></span>
+        </div>
+        <p class="overlay__sub" id="overlay-sub">NEON · DARK · ARCADE</p>
+        <div class="overlay__actions">
+          <button class="btn btn-primary" id="btn-start">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg>
+            BAŞLA
+          </button>
+          <button class="btn btn-ghost" id="btn-open-settings">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            TƏNZİMLƏMƏLƏR
+          </button>
+        </div>
+        <div class="overlay__hints">
+          <div class="hint-row">
+            <span class="hint-key"><kbd>W</kbd> <kbd>S</kbd></span>
+            <span class="hint-or">/</span>
+            <span class="hint-key"><kbd>↑</kbd> <kbd>↓</kbd></span>
+            <span class="hint-text">raketi hərəkət etdir</span>
+          </div>
+          <div class="hint-row">
+            <span class="hint-key"><kbd>Space</kbd></span>
+            <span class="hint-text">başlat və ya dayandır</span>
+          </div>
+          <div class="hint-row hint-row--mobile">
+            <span class="hint-icon">📱</span>
+            <span class="hint-text">mobil cihazda ekrana toxunaraq sürüklə</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="touchpad touchpad--left" id="touch-left" aria-hidden="true"></div>
+    <div class="touchpad touchpad--right" id="touch-right" aria-hidden="true"></div>
+  </main>
+
+  <dialog class="modal" id="modal-settings" aria-labelledby="settings-title">
+    <form method="dialog" class="modal__inner">
+      <header class="modal__head">
+        <h2 id="settings-title">⚙ TƏNZİMLƏMƏLƏR</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Bağla">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </header>
+      <div class="modal__body">
+
+        <fieldset class="field">
+          <legend>Rejim</legend>
+          <div class="card-row">
+            <label class="card-pick">
+              <input type="radio" name="mode" value="pvc" checked />
+              <span class="card-pick__inner">
+                <span class="card-pick__icon">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="6" width="16" height="12" rx="2"/><circle cx="9" cy="12" r="1.5" fill="currentColor"/><circle cx="15" cy="12" r="1.5" fill="currentColor"/><path d="M12 6V3"/></svg>
+                </span>
+                <span class="card-pick__title">SƏN vs AI</span>
+              </span>
+            </label>
+            <label class="card-pick">
+              <input type="radio" name="mode" value="pvp" />
+              <span class="card-pick__inner">
+                <span class="card-pick__icon">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                </span>
+                <span class="card-pick__title">İKİ NƏFƏR</span>
+              </span>
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset class="field">
+          <legend>AI çətinliyi</legend>
+          <div class="chip-row">
+            <label class="chip" data-tone="green">
+              <input type="radio" name="difficulty" value="easy" />
+              <span>ASAN</span>
+            </label>
+            <label class="chip" data-tone="yellow">
+              <input type="radio" name="difficulty" value="medium" checked />
+              <span>ORTA</span>
+            </label>
+            <label class="chip" data-tone="orange">
+              <input type="radio" name="difficulty" value="hard" />
+              <span>ÇƏTİN</span>
+            </label>
+            <label class="chip" data-tone="red">
+              <input type="radio" name="difficulty" value="impossible" />
+              <span>MÜMKÜNSÜZ</span>
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset class="field">
+          <legend>Qələbə üçün xal</legend>
+          <div class="seg" role="radiogroup">
+            <label class="seg__opt"><input type="radio" name="winScore" value="5" /><span>5</span></label>
+            <label class="seg__opt"><input type="radio" name="winScore" value="7" checked /><span>7</span></label>
+            <label class="seg__opt"><input type="radio" name="winScore" value="11" /><span>11</span></label>
+            <label class="seg__opt"><input type="radio" name="winScore" value="21" /><span>21</span></label>
+          </div>
+        </fieldset>
+
+        <fieldset class="field">
+          <legend>Effektlər</legend>
+          <div class="switch-grid">
+            <label class="switch">
+              <input type="checkbox" name="sound" checked />
+              <span class="switch__track"><span class="switch__thumb"></span></span>
+              <span>Səs</span>
+            </label>
+            <label class="switch">
+              <input type="checkbox" name="particles" checked />
+              <span class="switch__track"><span class="switch__thumb"></span></span>
+              <span>Qığılcımlar</span>
+            </label>
+            <label class="switch">
+              <input type="checkbox" name="shake" checked />
+              <span class="switch__track"><span class="switch__thumb"></span></span>
+              <span>Sarsıntı</span>
+            </label>
+            <label class="switch">
+              <input type="checkbox" name="trail" checked />
+              <span class="switch__track"><span class="switch__thumb"></span></span>
+              <span>Top izi</span>
+            </label>
+          </div>
+        </fieldset>
+      </div>
+      <footer class="modal__foot">
+        <button type="reset" class="btn btn-ghost">STANDART</button>
+        <button type="submit" value="confirm" class="btn btn-primary">SAXLA VƏ BAŞLA</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <footer class="credit">
+    Developed by
+    <a href="https://github.com/goshgarhasanov" target="_blank" rel="noopener">Goshgar Hasanzadeh</a>
+  </footer>
+
+  <script type="module" src="scripts/main.js"></script>
+</body>
+</html>
