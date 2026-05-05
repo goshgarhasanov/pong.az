@@ -12,7 +12,25 @@
 
 ### 🎮 [Canlı demo: goshgarhasanov.github.io/pong.az](https://goshgarhasanov.github.io/pong.az/)
 
+<br/>
+
+<img src="assets/screenshots/01-menu.png" width="900" alt="Pong.az əsas menyu" />
+
 </div>
+
+---
+
+## 📸 Ekran görüntüləri
+
+<table>
+<tr>
+<td width="50%" align="center"><b>⚙ Tənzimləmələr menyusu</b><br/>Vizual kart seçicilər, rəng-kodlu chip-lər, custom toggle-lar<br/><br/><img src="assets/screenshots/02-settings.png" alt="Tənzimləmələr" /></td>
+<td width="50%" align="center"><b>🎮 Oyun gedişində</b><br/>Mərkəzi xətt, neon raketlər, top izi<br/><br/><img src="assets/screenshots/03-play.png" alt="Oyun gedişində" /></td>
+</tr>
+<tr>
+<td colspan="2" align="center"><b>📱 Mobil görkəm (420 px)</b> — kart-lar tək sütunda stack, hər şey rahat sığır<br/><br/><img src="assets/screenshots/04-mobile.png" alt="Mobil görkəm" width="380" /></td>
+</tr>
+</table>
 
 ---
 
