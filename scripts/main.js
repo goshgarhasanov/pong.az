@@ -10,6 +10,10 @@ const DEFAULT_SETTINGS = {
   mode: "pvc",
   difficulty: "medium",
   winScore: 7,
+  paddleLen: 0.24,        // çubuq uzunluğu (canvas eninə nisbət)
+  ballSpeed: 0.45,        // top başlanğıc sürəti (canvas hündürlüyünə nisbət)
+  paddleSpeed: 1.2,       // klaviatura ilə çubuq sürəti
+  sensitivity: 1.0,       // toxunma hassasiyeti (1.0 = barmaq=çubuq, >1 = daha çevik)
   sound: true,
   particles: true,
   shake: true,
@@ -276,6 +280,10 @@ function fillForm() {
   form.elements.mode.value = state.settings.mode;
   form.elements.difficulty.value = state.settings.difficulty;
   form.elements.winScore.value = String(state.settings.winScore);
+  if (form.elements.paddleLen)   form.elements.paddleLen.value   = String(state.settings.paddleLen);
+  if (form.elements.ballSpeed)   form.elements.ballSpeed.value   = String(state.settings.ballSpeed);
+  if (form.elements.paddleSpeed) form.elements.paddleSpeed.value = String(state.settings.paddleSpeed);
+  if (form.elements.sensitivity) form.elements.sensitivity.value = String(state.settings.sensitivity);
   form.elements.sound.checked = state.settings.sound;
   form.elements.particles.checked = state.settings.particles;
   form.elements.shake.checked = state.settings.shake;
@@ -288,6 +296,10 @@ function readForm() {
     mode: form.elements.mode.value,
     difficulty: form.elements.difficulty.value,
     winScore: Number(form.elements.winScore.value),
+    paddleLen:   form.elements.paddleLen   ? Number(form.elements.paddleLen.value)   : DEFAULT_SETTINGS.paddleLen,
+    ballSpeed:   form.elements.ballSpeed   ? Number(form.elements.ballSpeed.value)   : DEFAULT_SETTINGS.ballSpeed,
+    paddleSpeed: form.elements.paddleSpeed ? Number(form.elements.paddleSpeed.value) : DEFAULT_SETTINGS.paddleSpeed,
+    sensitivity: form.elements.sensitivity ? Number(form.elements.sensitivity.value) : DEFAULT_SETTINGS.sensitivity,
     sound: form.elements.sound.checked,
     particles: form.elements.particles.checked,
     shake: form.elements.shake.checked,
@@ -303,21 +315,38 @@ function readForm() {
 
 function bindSettings() {
   fillForm();
-  dom.btnSettings.addEventListener("click", () => { playClick(); fillForm(); dom.modal.showModal(); });
-  dom.btnOpenSet.addEventListener("click", () => { playClick(); fillForm(); dom.modal.showModal(); });
+  const open = () => { playClick(); fillForm(); dom.modal.showModal(); };
+  dom.btnSettings.addEventListener("click", open);
+  dom.btnOpenSet.addEventListener("click", open);
+
   document.querySelectorAll("[data-close]").forEach((btn) => {
     btn.addEventListener("click", (e) => { e.preventDefault(); dom.modal.close(); });
   });
-  dom.modal.querySelector("form").addEventListener("submit", (e) => {
+
+  // Form daxilində istənilən dəyişiklik dərhal oyuna tətbiq olunur (live preview).
+  const form = dom.modal.querySelector("form");
+  form.addEventListener("change", () => readForm());
+  form.addEventListener("input", () => readForm());
+
+  // Modal bağlananda — əgər oyun pauza idisə, pause overlay-ini bərpa et.
+  dom.modal.addEventListener("close", () => {
+    if (state.game?.state === "paused") showPauseOverlay();
+  });
+
+  form.addEventListener("submit", (e) => {
     if (e.submitter && e.submitter.value === "confirm") {
       e.preventDefault();
       readForm();
       dom.modal.close();
-      showToast("Tənzimləmələr saxlanıldı");
-      startGame();
+      // Əgər oyun pauza idisə davam etdir, əks halda yeni oyun başlat.
+      if (state.game?.state === "paused") {
+        resumeFromPause();
+      } else {
+        startGame();
+      }
     }
   });
-  dom.modal.querySelector("[type=reset]").addEventListener("click", (e) => {
+  form.querySelector("[type=reset]").addEventListener("click", (e) => {
     e.preventDefault();
     state.settings = { ...DEFAULT_SETTINGS };
     saveSettings(state.settings);

@@ -40,10 +40,10 @@ class Paddle {
 
   resize() {
     const W = this.game.W, H = this.game.H;
-    this.w = Math.max(60, W * PADDLE_W_RATIO);   // uzun ölçü
-    this.h = Math.max(8, H * PADDLE_H_RATIO);    // qalın ölçü
+    const lenRatio = this._lenOverride ?? PADDLE_W_RATIO;
+    this.w = Math.max(60, W * lenRatio);
+    this.h = Math.max(8, H * PADDLE_H_RATIO);
     const margin = Math.max(12, H * PADDLE_MARGIN_RATIO);
-    // "left" = bottom (aşağıda), "right" = top (yuxarıda)
     this.y = this.side === "left" ? H - margin - this.h : margin;
     if (this.x === undefined) this.x = (W - this.w) / 2;
     this.x = clamp(this.x, 0, W - this.w);
@@ -62,8 +62,9 @@ class Paddle {
   }
 
   setVelocity(direction) {
-    // "direction" = -1 (sol) | 0 | +1 (sağ)
-    this.vx = direction * PADDLE_SPEED_RATIO * this.game.W;
+    // Klaviatura sürəti — game.options.paddleSpeed üzərindən idarə olunur.
+    const speedRatio = this.game.options.paddleSpeed ?? PADDLE_SPEED_RATIO;
+    this.vx = direction * speedRatio * this.game.W;
   }
 
   reset() {
@@ -103,8 +104,8 @@ class Ball {
     const W = this.game.W, H = this.game.H;
     this.x = W / 2 - this.size / 2;
     this.y = H / 2 - this.size / 2;
-    this.speed = BALL_INIT_SPEED * H;
-    // Şaquli yön əsas (top əsasən yuxarı/aşağı uçur)
+    const initRatio = this._initOverride ?? BALL_INIT_SPEED;
+    this.speed = initRatio * H;
     const angle = rand(-Math.PI / 5, Math.PI / 5);
     this.vy = direction * Math.cos(angle) * this.speed;
     this.vx = Math.sin(angle) * this.speed;
@@ -327,6 +328,7 @@ export class Game {
 
     this.input = { up: false, down: false, leftUp: false, leftDown: false };
     this.touchX = { left: null, right: null };  // X mövqe (üfüqi çubuq)
+    this._touchAnchor = null;                    // hassasiyet>1 üçün relative anchor
 
     this._onScore = options.onScore || (() => {});
     this._onGameOver = options.onGameOver || (() => {});
@@ -339,6 +341,15 @@ export class Game {
   setOption(key, value) {
     this.options[key] = value;
     if (key === "difficulty") this.ai.setDifficulty(value);
+    if (key === "paddleLen") {
+      // Paddle-ı dərhal yenidən ölçülə (oyun ortasında)
+      if (this.left)  { this.left._lenOverride = value; this.left.resize(); }
+      if (this.right) { this.right._lenOverride = value; this.right.resize(); }
+    }
+    if (key === "ballSpeed" && this.ball) {
+      this.ball._initOverride = value;
+    }
+    // paddleSpeed və sensitivity oyun döngüsündə birbaşa istifadə olunur
   }
 
   start() {
@@ -394,13 +405,33 @@ export class Game {
   }
 
   // ───── Toxunma giriş — barmağın X mövqeyinə görə çubuq hərəkəti ─────
+  // Hassasiyet (1.0 = barmaq mövqesi = çubuq, >1 = çubuq daha çevik) — relative drag.
   setTouchX(side, cssX) {
-    this.touchX[side] = clamp(cssX, 0, this.W);
+    const sens = this.options.sensitivity ?? 1.0;
+    if (Math.abs(sens - 1.0) < 0.01) {
+      // 1:1 — birbaşa snap (klassik)
+      this.touchX[side] = clamp(cssX, 0, this.W);
+      this._touchAnchor = null;
+      return;
+    }
+    // >1 və ya <1 hassasiyet — relative drag rejimi
+    if (!this._touchAnchor) this._touchAnchor = {};
+    if (this._touchAnchor[side] === undefined || this.touchX[side] === null) {
+      const paddle = side === "left" ? this.left : this.right;
+      this._touchAnchor[side] = { fingerX: cssX, paddleX: paddle.x + paddle.w / 2 };
+      this.touchX[side] = paddle.x + paddle.w / 2;
+    }
+    const anchor = this._touchAnchor[side];
+    const delta = (cssX - anchor.fingerX) * sens;
+    this.touchX[side] = clamp(anchor.paddleX + delta, 0, this.W);
   }
   // Geriyə uyğunluq üçün — köhnə main.js setTouchY çağırır; X kimi qəbul edirik
   setTouchY(side, cssX) { this.setTouchX(side, cssX); }
 
-  clearTouch(side) { this.touchX[side] = null; }
+  clearTouch(side) {
+    this.touchX[side] = null;
+    if (this._touchAnchor) delete this._touchAnchor[side];
+  }
 
   setInput(key, isDown) {
     this.input[key] = isDown;
