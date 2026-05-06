@@ -55,7 +55,9 @@ kbd {
   --font-mono: "JetBrains Mono", "Consolas", monospace;
 }
 
-/* — Body və global fon — */
+/* — Body və global fon —
+   Canvas tam ekran istifadə edir; topbar, skor və kredit
+   canvas-ın üzərinə overlay olur (ayrı sətir tutmurlar). */
 body {
   font-family: var(--font-ui);
   background: #000;
@@ -63,9 +65,10 @@ body {
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  display: grid;
-  grid-template-rows: auto auto 1fr auto;
   position: relative;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
 }
 
 body::before {
@@ -107,16 +110,31 @@ body::before {
   mix-blend-mode: overlay;
 }
 
-/* Bütün üst-alt UI-lər vignette-dən üstdə */
-.topbar, .scoreboard, .stage, .credit { position: relative; z-index: 3; }
+/* Stage tam viewport-u tutur; topbar/skor/credit overlay olunur */
+.stage {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+}
 
-/* — Topbar — */
+.topbar, .scoreboard, .credit {
+  z-index: 4;
+}
+
+/* — Topbar (overlay) — */
 .topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 14px 22px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.7), transparent);
+  pointer-events: none;
 }
+.topbar > * { pointer-events: auto; }
 
 .brand {
   display: flex;
@@ -172,14 +190,20 @@ body::before {
   transform: translateY(-1px);
 }
 
-/* — Scoreboard — */
+/* — Scoreboard (overlay) — */
 .scoreboard {
+  position: fixed;
+  top: 64px;
+  left: 0;
+  right: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 22px;
-  padding: 4px 22px 12px;
+  padding: 4px 22px;
+  pointer-events: none;
 }
+.scoreboard > * { pointer-events: auto; }
 
 .score {
   display: flex;
@@ -625,15 +649,22 @@ body::before {
 
 .toast--show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-/* Credit */
+/* Credit (overlay) */
 .credit {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
   text-align: center;
   font-size: 11px;
   color: var(--text-dim);
-  padding: 10px;
+  padding: 6px 10px;
   letter-spacing: 0.06em;
   font-family: var(--font-mono);
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.6), transparent);
+  pointer-events: none;
 }
+.credit a { pointer-events: auto; }
 
 .credit a {
   background: linear-gradient(120deg, var(--x-color), var(--o-color));
@@ -679,8 +710,10 @@ body::before {
   .score__name { font-size: 10px; letter-spacing: 0.12em; }
   .score__sep { font-size: 10px; }
 
-  /* Mobildə canvas-a maksimum şaquli yer ver — çubuqlar arası məsafə üçün */
-  .stage { padding: 4px 6px; }
+  /* Mobildə overlay-lər kompakt — canvas tam ekran tutur */
+  .topbar { padding: 8px 12px; }
+  .scoreboard { top: 50px; padding: 0 12px; }
+  .credit { font-size: 9px; padding: 3px 8px; }
 
   /* Overlay-lar kompakt */
   .overlay__title { font-size: 38px; letter-spacing: 2px; }
