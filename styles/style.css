@@ -679,8 +679,8 @@ body::before {
   .score__name { font-size: 10px; letter-spacing: 0.12em; }
   .score__sep { font-size: 10px; }
 
-  /* Mobildə zoom-u daha çox azaltmaq üçün böyük padding */
-  .stage { padding: 18px 14px; }
+  /* Mobildə canvas-a maksimum şaquli yer ver — çubuqlar arası məsafə üçün */
+  .stage { padding: 4px 6px; }
 
   /* Overlay-lar kompakt */
   .overlay__title { font-size: 38px; letter-spacing: 2px; }
