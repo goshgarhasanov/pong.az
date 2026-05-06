@@ -12,7 +12,7 @@ import { playPaddle, playWall, playScore, playWin } from "./sound.js";
 // Çubuqlar üfüqi (alt-üst), top şaquli yönlü hərəkət edir.
 const PADDLE_W_RATIO      = 0.24;    // çubuğun uzunluğu (canvas_width × bu)
 const PADDLE_H_RATIO      = 0.022;
-const PADDLE_MARGIN_RATIO = 0.04;
+const PADDLE_MARGIN_RATIO = 0.08;    // çubuqlar kənardan 2 dəfə daha uzaqda
 const BALL_SIZE_RATIO     = 0.024;
 const PADDLE_SPEED_RATIO  = 1.2;
 const BALL_INIT_SPEED     = 0.45;
