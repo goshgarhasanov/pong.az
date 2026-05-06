@@ -18,9 +18,9 @@ const PADDLE_SPEED_RATIO  = 1.2;
 const BALL_INIT_SPEED     = 0.45;
 // Sürətin üst həddi YOXDUR — top sonsuza qədər artır, amma artım çox yavaşlayır.
 // Diminishing returns: hər zərbədə inc = max(MIN, BASE - speedRatio × DAMPING)
-const BALL_INC_BASE       = 1.020;   // başlanğıcda hər zərbə +2%
-const BALL_INC_MIN        = 1.001;   // tam yüksək sürətdə cəmi +0.1% (heç vaxt 0 olmur)
-const BALL_INC_DAMPING    = 0.012;   // sürətə görə zəifləmə
+const BALL_INC_BASE       = 1.050;   // başlanğıcda hər zərbə +5% (rahat hiss olunur)
+const BALL_INC_MIN        = 1.015;   // yüksək sürətdə də hər zərbə +1.5% (heç vaxt sönmür)
+const BALL_INC_DAMPING    = 0.015;   // sürətə görə zəifləmə
 const SHAKE_DECAY = 0.86;
 
 // ───── Yardımçı ─────
