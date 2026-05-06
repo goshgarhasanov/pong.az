@@ -112,6 +112,21 @@ function hideOverlay() {
   dom.overlay.classList.add("overlay--hidden");
 }
 
+/** Pauza overlay-i — oyun davam edir, lakin gözlədir. */
+function showPauseOverlay() {
+  dom.overlayTitle.textContent = "DAYANDIRILDI";
+  dom.overlaySub.textContent = "Davam etmək üçün ↓";
+  dom.btnStart.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg> DAVAM ET`;
+  showOverlay();
+}
+
+function resumeFromPause() {
+  if (state.game?.state === "paused") {
+    state.game.resume();
+    hideOverlay();
+  }
+}
+
 function startGame() {
   resumeAudio();
   if (!state.game) state.game = createGame();
@@ -154,15 +169,17 @@ function bindKeyboard() {
       e.preventDefault();
       if (state.game?.state === "menu" || state.game?.state === "gameover" || !state.game) {
         startGame();
+      } else if (state.game.state === "paused") {
+        resumeFromPause();
       } else {
-        state.game.togglePause();
-        showToast(state.game.state === "paused" ? "Dayandırıldı" : "Davam edir");
+        state.game.pause();
+        showPauseOverlay();
       }
     }
     if (e.key === "Escape") {
       if (state.game?.state === "playing") {
         state.game.pause();
-        showOverlay();
+        showPauseOverlay();
       }
     }
   });
@@ -327,14 +344,26 @@ function init() {
   bindTouch();
   bindSettings();
 
-  dom.btnStart.addEventListener("click", () => { playClick(); startGame(); });
+  dom.btnStart.addEventListener("click", () => {
+    playClick();
+    // Pauza vəziyyətindədirsə → davam et, əks halda yenidən başla
+    if (state.game?.state === "paused") {
+      resumeFromPause();
+    } else {
+      startGame();
+    }
+  });
   dom.btnPause.addEventListener("click", () => {
     playClick();
     if (!state.game || state.game.state === "menu" || state.game.state === "gameover") {
       startGame();
+      return;
+    }
+    if (state.game.state === "paused") {
+      resumeFromPause();
     } else {
-      state.game.togglePause();
-      if (state.game.state === "paused") showOverlay(); else hideOverlay();
+      state.game.pause();
+      showPauseOverlay();
     }
   });
   dom.btnSound.addEventListener("click", () => {

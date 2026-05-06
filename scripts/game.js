@@ -10,14 +10,17 @@ import { playPaddle, playWall, playScore, playWin } from "./sound.js";
 // ───── Proporsional sabitlər ─────
 // Canvas hündürlüyünə görə nisbətlər; faktiki piksel ölçüləri _resize-də hesablanır.
 // Çubuqlar üfüqi (alt-üst), top şaquli yönlü hərəkət edir.
-const PADDLE_W_RATIO      = 0.18;    // çubuğun uzunluğu (canvas_width × bu)
-const PADDLE_H_RATIO      = 0.022;   // çubuğun qalınlığı (canvas_height × bu)
-const PADDLE_MARGIN_RATIO = 0.04;    // alt/üst kənardan məsafə
+const PADDLE_W_RATIO      = 0.24;    // çubuğun uzunluğu (canvas_width × bu)
+const PADDLE_H_RATIO      = 0.022;
+const PADDLE_MARGIN_RATIO = 0.04;
 const BALL_SIZE_RATIO     = 0.024;
-const PADDLE_SPEED_RATIO  = 1.2;     // canvas_width/saniyə (üfüqi sürət)
-const BALL_INIT_SPEED     = 0.55;    // canvas_height/saniyə (yumşaq)
-const BALL_MAX_SPEED      = 1.50;
-const BALL_SPEED_INC = 1.025;        // hər zərbədə 2.5%
+const PADDLE_SPEED_RATIO  = 1.2;
+const BALL_INIT_SPEED     = 0.45;
+// Sürətin üst həddi YOXDUR — top sonsuza qədər artır, amma artım çox yavaşlayır.
+// Diminishing returns: hər zərbədə inc = max(MIN, BASE - speedRatio × DAMPING)
+const BALL_INC_BASE       = 1.020;   // başlanğıcda hər zərbə +2%
+const BALL_INC_MIN        = 1.001;   // tam yüksək sürətdə cəmi +0.1% (heç vaxt 0 olmur)
+const BALL_INC_DAMPING    = 0.012;   // sürətə görə zəifləmə
 const SHAKE_DECAY = 0.86;
 
 // ───── Yardımçı ─────
@@ -130,8 +133,10 @@ class Ball {
     const offset = (ballCenter - paddleCenter) / (paddle.w / 2); // [-1, 1]
     const bounceAngle = offset * (Math.PI / 3.4);
 
-    const maxSpeed = BALL_MAX_SPEED * this.game.H;
-    this.speed = Math.min(maxSpeed, this.speed * BALL_SPEED_INC);
+    // Diminishing returns — sürət artdıqca artım çox az olur, amma heç vaxt 0-a düşmür.
+    const speedRatio = this.speed / this.game.H;
+    const inc = Math.max(BALL_INC_MIN, BALL_INC_BASE - speedRatio * BALL_INC_DAMPING);
+    this.speed = this.speed * inc;
     // "left" = bottom çubuq → top yuxarı qayıdır (vy mənfi)
     // "right" = top çubuq → top aşağı qayıdır (vy müsbət)
     const direction = paddle.side === "left" ? -1 : 1;
