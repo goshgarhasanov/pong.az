@@ -9,6 +9,7 @@
 [![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?logo=javascript&logoColor=black)]()
 [![Lisenziya: MIT](https://img.shields.io/badge/lisenziya-MIT-A8A8C0)](LICENSE)
 [![No build](https://img.shields.io/badge/build-yox%20%E2%80%94%20saf%20vanilla-84CC16)]()
+[![Bir qəhvə al](https://img.shields.io/badge/%E2%98%95-Bir%20q%C9%99hv%C9%99%20al-ff7d5a)](https://kofe.al/@goshgarhasanov)
 
 ### 🎮 [Canlı demo: goshgarhasanov.github.io/pong.az](https://goshgarhasanov.github.io/pong.az/)
 
